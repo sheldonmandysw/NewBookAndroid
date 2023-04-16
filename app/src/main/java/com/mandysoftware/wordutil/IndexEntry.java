@@ -8,6 +8,7 @@ public class IndexEntry
 
     // The word keys are 4 bytes each in the word index.
     static final long DEFAULT_SUGGEST_MASK = 0xFFFFFFFF;
+    static final int SUGGEST_KEY_LENGTH = 4;
 
     static long MakeKeyMask(Object lenParam, long defaultMask)
     {
