@@ -21,7 +21,7 @@ public class WapTest {
         Assertions.assertEquals(1, reader.entries.get(0).key);
         Assertions.assertEquals(4, reader.entries.get(0).value);
         Assertions.assertEquals(2, reader.entries.get(1).key);
-        Assertions.assertEquals(898, reader.entries.get(1).value);
+        Assertions.assertEquals(900, reader.entries.get(1).value);
     }
 
     @Test

@@ -4,10 +4,12 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.IntBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Scanner;
 import java.util.zip.DataFormatException;
 
 public class WapReader {
@@ -18,6 +20,18 @@ public class WapReader {
     final ArrayList<IndexEntry.Lookup> entries = new ArrayList<>();
     long endofs = 0;
 
+    static int findEndlInRawUtf8(byte [] chunk, int i0)
+    {
+        int idx = i0 + 1;
+
+        while (idx < chunk.length && chunk[idx] != '\n')
+        {
+            idx += 1;
+        }
+
+        return idx;
+    }
+
     static class PeekWord implements Search.Peek
     {
         static final PeekWord Instance = new PeekWord();
@@ -25,11 +39,11 @@ public class WapReader {
         @Override
         public Comparable peek(final List arr, final int idx, final Object param)
         {
-            String chunk = (String) param;
+            byte [] chunk = (byte []) param;
             int wordStart = (Integer) arr.get(idx);
-            int idxEndl = chunk.indexOf('\n', wordStart);
+            int idxEndl = findEndlInRawUtf8(chunk, wordStart);
 
-            return chunk.substring(wordStart, idxEndl);
+            return new String(chunk, wordStart, idxEndl - wordStart, StandardCharsets.UTF_8);
         }
     }
 
@@ -54,7 +68,8 @@ public class WapReader {
 
         inputStream.getChannel().position(idxendofs);
         inputStream.read(fourBytes);
-        endofs = java.nio.ByteBuffer.wrap(fourBytes).getInt();
+        endofs = java.nio.ByteBuffer.wrap(fourBytes)
+                .order(ByteOrder.BIG_ENDIAN).getInt();
 
         int nidx = (int) ((idxendofs - endofs) / 6);
         inputStream.getChannel().position(endofs);
@@ -84,9 +99,9 @@ public class WapReader {
         return key;
     }
 
-    protected String lookupWord(String word) throws IOException, DataFormatException
+    public byte [] lookupEntry(String name) throws IOException, DataFormatException
     {
-        int ic = lookupIndex(word);
+        int ic = lookupIndex(name);
 
         if (ic == -1)
         {
@@ -104,48 +119,54 @@ public class WapReader {
         }
 
         inputStream.getChannel().position(ofsnow);
-        byte [] rawBytes = new byte[(int)(ofsnext - ofsnow)];
-        inputStream.read(rawBytes);
+        byte [] compressedBytes = new byte[(int)(ofsnext - ofsnow)];
+        inputStream.read(compressedBytes);
 
-        byte [] encodedText = Compression.Inflate(rawBytes);
-        String textChunk = new String(encodedText, StandardCharsets.UTF_8);
+        byte [] rawBytes = Compression.Inflate(compressedBytes);
 
-        int iend = textChunk.length() - 2;
+        int iend = rawBytes.length - 4;
+        int ofsidx = java.nio.ByteBuffer.wrap(rawBytes, iend, 4)
+                .order(ByteOrder.BIG_ENDIAN).getInt();
+        int nwds = (iend - ofsidx) / 4;
 
-        iend = textChunk.lastIndexOf('\n', iend);
+        IntBuffer idxlistbuf = ByteBuffer.wrap(rawBytes, ofsidx, iend - ofsidx)
+                .order(ByteOrder.BIG_ENDIAN)
+                .asIntBuffer();
+        int [] idxlistarr = new int[nwds];
 
-        iend += 1;
+        idxlistbuf.get(idxlistarr);
 
-        int ofsidx = Integer.valueOf(textChunk.substring(iend));
+        List<Integer> idxlist = new ArrayList<>(idxlistarr.length);
 
-        String wordIndexAsText = textChunk.substring(ofsidx + 1, iend - 1);
-        Scanner wordIndexScanner = new Scanner(wordIndexAsText);
-        ArrayList<Integer> wordIndex = new ArrayList<>();
-
-        while (wordIndexScanner.hasNextLine())
+        for (int idx : idxlistarr)
         {
-            String line = wordIndexScanner.nextLine();
-
-            wordIndex.add(Integer.valueOf(line));
+            idxlist.add(idx);
         }
 
-        wordIndexScanner.close();
-
-        int iw = Search.BinarySearch(wordIndex, word, PeekWord.Instance, textChunk, Search.Mode.EQ);
+        int iw = Search.BinarySearch(idxlist, name, PeekWord.Instance, rawBytes, Search.Mode.EQ);
 
         if (iw == -1)
         {
             throw new IllegalArgumentException("Word not found.");
         }
 
-        int entryStart = textChunk.indexOf('\n', wordIndex.get(iw)) + 1;
+        int entryStart = findEndlInRawUtf8(rawBytes, idxlist.get(iw)) + 1;
         int entryEnd = ofsidx;
 
-        if (iw + 1 < wordIndex.size())
+        if (iw + 1 < idxlist.size())
         {
-            entryEnd = wordIndex.get(iw + 1);
+            entryEnd = idxlist.get(iw + 1);
         }
 
-        return textChunk.substring(entryStart, entryEnd);
+        byte [] entryBytes = new byte[entryEnd - entryStart];
+
+        System.arraycopy(rawBytes, entryStart, entryBytes, 0, entryEnd - entryStart);
+
+        return entryBytes;
+    }
+
+    public String lookupWord(String word) throws IOException, DataFormatException
+    {
+        return new String(lookupEntry(word), StandardCharsets.UTF_8);
     }
 }
