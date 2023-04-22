@@ -27,7 +27,9 @@ class MainActivity : AppCompatActivity(), CompositeDictionary.DictionaryCallback
         dictionary!!.addDictionaryCallback(this)
         dictionary!!.postCommand(CompositeDictionary.Command(CompositeDictionary.CommandName.INIT))
 
-        testCommands()
+        // The following was used for testing. Don't uncomment unless you want to test it again.
+        // It's manual testing, so you just look in LogCat to see that it's working.
+        //testCommands()
     }
 
     override fun onDestroy() {
