@@ -116,10 +116,6 @@ class MainActivity : AppCompatActivity(), CompositeDictionary.DictionaryCallback
         //runOnUiThread({
         //    .... code to update the UI goes here ...
         //})
-
-        Log.i(TAG, "Dictionary download progress: " + bytesDownloaded +
-                " of " + bytesTotal +
-                " for " + dictionaryInfo.name)
     }
 
     override fun onDictionaryDownloadComplete(

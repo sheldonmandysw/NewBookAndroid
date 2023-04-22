@@ -18,7 +18,7 @@ import java.util.zip.DataFormatException;
 public class CompositeDictionary {
     final static String TAG = "CompositeDictionary";
 
-    final static String URL_PREFIX = "http://mandysoftware.com/res/words";
+    final static String URL_PREFIX = "https://mandysoftware.com/res/words";
 
     // The index only has just the bare minimum info on each of the very few dictionaries.
     // We don't need a very high limit for this. If the file is larger than this, then
@@ -613,8 +613,9 @@ public class CompositeDictionary {
         }
 
         String indexPath = getDictionaryPath(dictionaryRoot, "index.txt");
+        File indexFile = new File(indexPath);
 
-        if (!new File(indexPath).exists()) {
+        if (!indexFile.exists() || indexFile.length() == 0) {
             backgroundDownloadIndex();
         }
 
@@ -710,6 +711,12 @@ public class CompositeDictionary {
         inputStream.close();
 
         dictionaryList.clear();
+
+        if (bytesRead == 0)
+        {
+            Log.e(TAG, "No bytes read from the index file.");
+            return;
+        }
 
         String indexText = new String(indexBytes, 0, bytesRead, StandardCharsets.UTF_8);
         Scanner scanner = new Scanner(indexText);

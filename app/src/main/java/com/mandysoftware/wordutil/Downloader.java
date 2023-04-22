@@ -42,7 +42,7 @@ public class Downloader {
 
             int progressCumulative = 0;
 
-            while (inputStream.available() > 0)
+            while (true)
             {
                 int bytesRead = inputStream.read(data);
 
