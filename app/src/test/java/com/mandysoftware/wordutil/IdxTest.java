@@ -99,7 +99,29 @@ public class IdxTest {
         Assertions.assertEquals(1, suggestions.size());
         Assertions.assertEquals("\uD83D\uDF7F", suggestions.get(0));
 
+        // Test on some random jibberish that does not exist.
+        suggestions = reader.suggest("ashglakshgljkashfklgjaskldhgklasdjlk");
+
+        Assertions.assertEquals(0, suggestions.size());
+
         // And of course clean up.
+        reader.close();
+    }
+
+    @Test
+    void testRead() throws IOException, DataFormatException
+    {
+        File inputFile = new File("src/test/resources/uk.idx");
+        IdxReader reader = new IdxReader(inputFile);
+
+        String firstWord = reader.firstWord();
+
+        Assertions.assertEquals("(бути) в своєму репертуарі", firstWord);
+
+        String lastWord = reader.lastWord();
+
+        Assertions.assertEquals("\uD83D\uDF7F", lastWord);
+
         reader.close();
     }
 

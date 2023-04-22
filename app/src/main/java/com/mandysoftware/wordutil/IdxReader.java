@@ -45,11 +45,20 @@ public class IdxReader {
     {
         final int bound_a;
         final int bound_b;
+        final int cumulative;
 
         public Bounds(int a, int b)
         {
             bound_a = a;
             bound_b = b;
+            cumulative = 0;
+        }
+
+        public Bounds(int a, int b, int cumulative)
+        {
+            bound_a = a;
+            bound_b = b;
+            this.cumulative = cumulative;
         }
     }
 
@@ -77,7 +86,7 @@ public class IdxReader {
         endofs = java.nio.ByteBuffer.wrap(fourBytes)
                 .order(ByteOrder.BIG_ENDIAN).getInt();
 
-        int nidx = (int) ((idxendofs - endofs) / 12);
+        int nidx = (int) ((idxendofs - endofs) / 16);
         inputStream.getChannel().position(endofs);
         entries.clear();
 
@@ -85,9 +94,10 @@ public class IdxReader {
         for (int i = 0; i < nidx; i += 1)
         {
             int ofs = dis.readInt();
+            int cnt = dis.readInt();
             int key_a = dis.readInt();
             int key_b = dis.readInt();
-            entries.add(new IndexEntry.Suggest(key_a, key_b, ofs));
+            entries.add(new IndexEntry.Suggest(key_a, key_b, ofs, cnt));
         }
     }
 
@@ -134,6 +144,27 @@ public class IdxReader {
         return new Bounds(ic_idx_a, ic_idx_b);
     }
 
+    Bounds findIndexBounds(int wordIndex)
+    {
+        int cumulativeCount = 0;
+        int foundIndex = -1;
+
+        for (int i = 0; i < entries.size(); i += 1)
+        {
+            IndexEntry.Suggest entry = entries.get(i);
+
+            if (wordIndex >= cumulativeCount && wordIndex < cumulativeCount + entry.count)
+            {
+                foundIndex = i;
+                break;
+            }
+
+            cumulativeCount += entry.count;
+        }
+
+        return new Bounds(foundIndex, foundIndex, cumulativeCount);
+    }
+
     ArrayList<String> decodeChunksIntoLines(Bounds bounds, String prefix, int countLimit)
             throws IOException, DataFormatException
     {
@@ -173,6 +204,10 @@ public class IdxReader {
                 String line = scanner.nextLine();
                 String word = line.trim();
 
+                // Note that prefix can be the empty string "" which is perfectly OK.
+                // In that case, all words will be matched (i.e., the below 'continue'
+                // will never be reached, such that we add all words to the return list).
+                //
                 if (!word.toLowerCase(Locale.ROOT).startsWith(lowerPrefix))
                 {
                     continue;
@@ -212,6 +247,48 @@ public class IdxReader {
     public ArrayList<String> suggest(String prefix) throws IOException, DataFormatException
     {
         return suggest(prefix, DEFAULT_SUGGESTION_COUNT_LIMIT);
+    }
+
+    public int countWords()
+    {
+        int result = 0;
+
+        for (int i = 0; i < entries.size(); i += 1)
+        {
+            result += entries.get(i).count;
+        }
+
+        return result;
+    }
+
+    public String readWord(int index) throws IOException, DataFormatException
+    {
+        Bounds bounds = findIndexBounds(index);
+        int wordsInChunk = (int) entries.get(bounds.bound_a).count;
+        int subIndex = index - bounds.cumulative;
+
+        // We just want to decode up to the subIndex word since that's all we need.
+        List<String> words = decodeChunksIntoLines(bounds, "", subIndex + 1);
+
+        return words.get(subIndex);
+    }
+
+    public String randomWord() throws IOException, DataFormatException
+    {
+        int wordCount = countWords();
+        int wordIndex = (int) Math.floor(wordCount * Math.random());
+
+        return readWord(wordIndex);
+    }
+
+    public String firstWord() throws IOException, DataFormatException
+    {
+        return readWord(0);
+    }
+
+    public String lastWord() throws IOException, DataFormatException
+    {
+        return readWord(countWords() - 1);
     }
 
 }

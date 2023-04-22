@@ -40,6 +40,19 @@ public class WapTest {
 
         Assertions.assertEquals(appleText, wordEntry);
 
+        Exception resultException = null;
+
+        try {
+            reader.lookupWord("aaslkghaslkdghkashdglkasghl");
+        }
+        catch (IllegalArgumentException err)
+        {
+            resultException = err;
+        }
+
+        Assertions.assertNotNull(resultException);
+        Assertions.assertEquals("Word not found.", resultException.getMessage());
+
         reader.close();
     }
 

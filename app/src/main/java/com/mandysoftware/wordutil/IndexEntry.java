@@ -52,6 +52,7 @@ public class IndexEntry
     {
         long key_a = 0;
         long key_b = 0;
+        long count = 0;
         long value = 0;
 
         public static class PeekA implements Search.Peek
@@ -80,11 +81,12 @@ public class IndexEntry
             }
         }
 
-        public Suggest(int key_a, int key_b, int value)
+        public Suggest(int key_a, int key_b, int value, int count)
         {
             this.key_a = Integer.toUnsignedLong(key_a);
             this.key_b = Integer.toUnsignedLong(key_b);
             this.value = Integer.toUnsignedLong(value);
+            this.count = Integer.toUnsignedLong(count);
         }
     }
 }
