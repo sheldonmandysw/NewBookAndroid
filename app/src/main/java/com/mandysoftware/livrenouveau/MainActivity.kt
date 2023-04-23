@@ -1,8 +1,10 @@
 package com.mandysoftware.livrenouveau
 
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.widget.Button
 import com.mandysoftware.wordutil.CompositeDictionary
 import java.io.File
 import java.lang.Exception
@@ -14,7 +16,6 @@ class MainActivity : AppCompatActivity(), CompositeDictionary.DictionaryCallback
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
 
         val storageDir = filesDir
         val dictionaryDir = File(storageDir, "dictionary")
@@ -30,10 +31,18 @@ class MainActivity : AppCompatActivity(), CompositeDictionary.DictionaryCallback
         // The following was used for testing. Don't uncomment unless you want to test it again.
         // It's manual testing, so you just look in LogCat to see that it's working.
         //testCommands()
+
+        setContentView(R.layout.activity_main)
+
+        findViewById<Button>(R.id.btnLaunchManager).setOnClickListener({
+            val intent = Intent(this, ManageDictionaryActivity::class.java)
+            startActivity(intent)
+        })
     }
 
     override fun onDestroy() {
         dictionary!!.close()
+        dictionary = null
         super.onDestroy()
     }
 

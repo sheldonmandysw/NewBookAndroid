@@ -39,6 +39,11 @@ public class CompositeDictionary {
 
     final File dictionaryRoot;
 
+    public List<DictionaryInfo> getDictionaryList()
+    {
+        return dictionaryList;
+    }
+
     public enum CommandName
     {
         INIT,
