@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
@@ -20,9 +21,41 @@ public class Downloader {
         void onDownloadComplete(boolean success, @Nullable Exception err, int totalLoaded);
     }
 
+    public static class HeadInfo
+    {
+        public int status;
+        public int contentLength;
+        public long lastModified;
+    }
+
+    public static HeadInfo Head(String inputUrl) throws IOException
+    {
+        URL url = new URL(inputUrl);
+        URLConnection connection = url.openConnection();
+
+        if (!(connection instanceof HttpURLConnection))
+        {
+            throw new IllegalArgumentException("Only HTTP URLs can be HEAD-ed.");
+        }
+
+        HttpURLConnection httpConnection = (HttpURLConnection) connection;
+
+        httpConnection.setRequestMethod("HEAD");
+        httpConnection.connect();
+
+        HeadInfo headInfo = new HeadInfo();
+
+        headInfo.status = httpConnection.getResponseCode();
+        headInfo.contentLength = httpConnection.getContentLength();
+        headInfo.lastModified = httpConnection.getLastModified();
+
+        return headInfo;
+    }
+
     public static void Download(String inputUrl, String outputFilename, ProgressCallback callback)
     {
         int fileLength = -1;
+        int progressCumulative = 0;
 
         try {
             URL url = new URL(inputUrl);
@@ -39,8 +72,6 @@ public class Downloader {
             OutputStream outputStream = new FileOutputStream(outputFilename);
 
             byte [] data = new byte[DOWNLOAD_BUFFER_SIZE];
-
-            int progressCumulative = 0;
 
             while (true)
             {

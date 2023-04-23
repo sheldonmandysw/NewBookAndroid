@@ -3,10 +3,12 @@
 
     <string name="available_dictionaries">Available dictionaries</string>
 
+    <string name="manage_dictionary_download_size">Download ([size])</string>
+    <string name="manage_dictionary_update_size">Update ([size])</string>
     <string name="manage_dictionary_download">Download</string>
+    <string name="manage_dictionary_update">Update</string>
     <string name="manage_dictionary_cancel">Cancel</string>
     <string name="manage_dictionary_delete">Delete</string>
-    <string name="manage_dictionary_update">Update</string>
 
     <string name="launch_dictionary_manager">Manage Dictionaries</string>
 

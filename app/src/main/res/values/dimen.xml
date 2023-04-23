@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <dimen name="dictionary_manage_progress_height">20dp</dimen>
+    <dimen name="dictionary_manage_padding_horizontal">4dp</dimen>
+    <dimen name="dictionary_manage_padding_vertical">10dp</dimen>
 </resources>

@@ -189,6 +189,15 @@ class MainActivity : AppCompatActivity(), CompositeDictionary.DictionaryCallback
         Log.i(TAG, "Dictionary index loaded; success: $success")
     }
 
+    override fun onHeadFilesComplete(successful : Int, total : Int,
+                                     success: Boolean, err: Exception?) {
+        // nothing to do
+    }
+
+    override fun onLocalFilesChecked() {
+        // nothing to do
+    }
+
     override fun onDictionaryLookup(
         results: MutableList<CompositeDictionary.LookupResult>,
         successful: Int,

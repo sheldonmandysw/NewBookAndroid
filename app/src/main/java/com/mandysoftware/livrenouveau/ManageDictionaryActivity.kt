@@ -1,7 +1,6 @@
 package com.mandysoftware.livrenouveau
 
-import android.content.Context
-import android.icu.lang.UCharacter.VerticalOrientation
+import android.annotation.SuppressLint
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
@@ -11,13 +10,15 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.recyclerview.widget.RecyclerView.Adapter
 import com.mandysoftware.wordutil.CompositeDictionary
 import com.mandysoftware.wordutil.CompositeDictionary.DictionaryInfo
+import com.mandysoftware.wordutil.Text
 import java.io.File
 import java.lang.Exception
+import java.util.*
 
 class ManageDictionaryActivity : AppCompatActivity(), CompositeDictionary.DictionaryCallback {
     val TAG = "ManageDictionaryAty"
@@ -25,16 +26,27 @@ class ManageDictionaryActivity : AppCompatActivity(), CompositeDictionary.Dictio
     var dictionary : CompositeDictionary? = null
 
     var rvDictionaryList : RecyclerView? = null
+    var rvAdapter : DictionaryManagerAdapter? = null
 
     inner class DictionaryManagerAdapter : RecyclerView.Adapter<DictionaryItemViewHolder>()
     {
+        // An int that tells us a type. We're only using one type for this RecyclerView.
+        val TYPE_DICTIONARY_ITEM = 1
+
+        // Creates a view holder for TYPE_DICTIONARY_ITEM.
         override fun onCreateViewHolder(
             parent: ViewGroup,
             viewType: Int
         ): DictionaryItemViewHolder {
-            val root = LayoutInflater.from(this@ManageDictionaryActivity)
-                .inflate(R.layout.dictionary_manager_item, parent, false)
-            return DictionaryItemViewHolder(root)
+            if (viewType == TYPE_DICTIONARY_ITEM) {
+                val root = LayoutInflater.from(this@ManageDictionaryActivity)
+                    .inflate(R.layout.dictionary_manager_item, parent, false)
+                return DictionaryItemViewHolder(root)
+            }
+            else
+            {
+                throw IllegalArgumentException("Urecognized view type.")
+            }
         }
 
         override fun getItemCount(): Int {
@@ -44,9 +56,15 @@ class ManageDictionaryActivity : AppCompatActivity(), CompositeDictionary.Dictio
         override fun onBindViewHolder(holder: DictionaryItemViewHolder, position: Int) {
             holder.bind(dictionary!!.dictionaryList[position])
         }
+
+        // For this one, all of them are of the same type
+        // because each card in the list shows info about a dictionary.
+        override fun getItemViewType(position: Int): Int {
+            return TYPE_DICTIONARY_ITEM
+        }
     }
 
-    class DictionaryItemViewHolder(root: View) : RecyclerView.ViewHolder(root) {
+    inner class DictionaryItemViewHolder(root: View) : RecyclerView.ViewHolder(root) {
         val tvName : TextView
         val tvSize : TextView
         val tvDesc : TextView
@@ -56,6 +74,9 @@ class ManageDictionaryActivity : AppCompatActivity(), CompositeDictionary.Dictio
 
         val pbDownload : ProgressBar
 
+        var downloadBtnState = "download"
+        var dictionaryInfo : DictionaryInfo? = null
+
         init {
             tvName = root.findViewById(R.id.tvName)
             tvSize = root.findViewById(R.id.tvSize)
@@ -63,32 +84,137 @@ class ManageDictionaryActivity : AppCompatActivity(), CompositeDictionary.Dictio
             btnDownload = root.findViewById(R.id.btnDownload)
             btnUpdate = root.findViewById(R.id.btnUpdate)
             pbDownload = root.findViewById(R.id.pbDownload)
+
+            btnDownload.setOnClickListener {
+                if (downloadBtnState.equals("download"))
+                {
+                    dictionary!!.postCommand(
+                        CompositeDictionary.Command(
+                            CompositeDictionary.CommandName.DOWNLOAD_DICTIONARY,
+                            dictionaryInfo!!.name
+                        )
+                    )
+                }
+                else if (downloadBtnState.equals("delete"))
+                {
+                    dictionary!!.postCommand(
+                        CompositeDictionary.Command(
+                            CompositeDictionary.CommandName.DELETE_DICTIONARY,
+                            dictionaryInfo!!.name
+                        )
+                    )
+                }
+            }
+
+            btnUpdate.setOnClickListener {
+                dictionary!!.postCommand(
+                    CompositeDictionary.Command(
+                        CompositeDictionary.CommandName.DOWNLOAD_DICTIONARY,
+                        dictionaryInfo!!.name
+                    )
+                )
+            }
         }
 
         fun bind(info : DictionaryInfo)
         {
+            dictionaryInfo = info
+
             tvName.text = info.name
-            tvSize.text = ""
             tvDesc.text = info.description
-            btnUpdate.visibility = View.GONE
-            pbDownload.visibility = View.GONE
+
+            if (info.fileSizeLocal > 0) {
+                tvSize.text = Text.formatFileSize(info.fileSizeLocal, Locale.getDefault())
+            }
+            else
+            {
+                tvSize.text = ""
+            }
+
+            if (info.isAvailableOffline)
+            {
+                btnDownload.setText(getString(R.string.manage_dictionary_delete))
+                downloadBtnState = "delete"
+            }
+            else if (info.progress == 0 || info.progress == 100)
+            {
+                if (info.fileSizeRemote > 0) {
+                    btnDownload.setText(
+                        getString(R.string.manage_dictionary_download_size)
+                            .replace(
+                                "[size]",
+                                Text.formatFileSize(info.fileSizeRemote, Locale.getDefault())
+                            )
+                    )
+                }
+                else
+                {
+                    btnDownload.setText(getString(R.string.manage_dictionary_download))
+                }
+                downloadBtnState = "download"
+            }
+            else
+            {
+                btnDownload.setText(getString(R.string.manage_dictionary_cancel))
+                downloadBtnState = "cancel"
+            }
+
+            if (info.hasUpdate && (info.progress == 0 || info.progress == 100))
+            {
+                if (info.fileSizeRemote > 0) {
+                    btnUpdate.setText(
+                        getString(R.string.manage_dictionary_update_size)
+                            .replace(
+                                "[size]",
+                                Text.formatFileSize(info.fileSizeRemote, Locale.getDefault())
+                            )
+                    )
+                }
+                else
+                {
+                    btnUpdate.setText(getString(R.string.manage_dictionary_update))
+                }
+                btnUpdate.visibility = View.VISIBLE
+            }
+            else
+            {
+                btnUpdate.visibility = View.GONE
+            }
+
+            if (info.progress != 0 && info.progress != 100)
+            {
+                pbDownload.progress = info.progress
+                pbDownload.visibility = View.VISIBLE
+            }
+            else
+            {
+                pbDownload.visibility = View.GONE
+            }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // The generic loading - can copy-paste this into any other activity that needs it.
         dictionary = CompositeDictionary(File(filesDir, "dictionary"))
         dictionary!!.addDictionaryCallback(this)
         dictionary!!.postCommand(CompositeDictionary.Command(CompositeDictionary.CommandName.INIT))
 
+        // Then post another command that is specific only to manage dictionaries activity.
+        dictionary!!.postCommand(CompositeDictionary.Command(CompositeDictionary.CommandName.UPDATE_LOCAL))
+        dictionary!!.postCommand(CompositeDictionary.Command(CompositeDictionary.CommandName.HEAD_FILES))
+
+        // Then generic again. Set up the views. The setContentView() must come BEFORE any find*().
         setContentView(R.layout.activity_manage_dictionary)
+
+        rvAdapter = DictionaryManagerAdapter()
 
         rvDictionaryList = findViewById(R.id.rvDictionaryList)
         rvDictionaryList!!.layoutManager = LinearLayoutManager(this,
             LinearLayoutManager.VERTICAL,
             false)
-        rvDictionaryList!!.adapter = DictionaryManagerAdapter()
+        rvDictionaryList!!.adapter = rvAdapter!!
     }
 
     override fun onDestroy() {
@@ -100,6 +226,10 @@ class ManageDictionaryActivity : AppCompatActivity(), CompositeDictionary.Dictio
 
     override fun onDictionaryError(command: CompositeDictionary.Command?, err: Exception) {
         Log.e(TAG, "Dictionary error: ${err.message}")
+
+        runOnUiThread {
+            Toast.makeText(this, err.message, Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onDictionaryDownloadProgress(
@@ -107,7 +237,9 @@ class ManageDictionaryActivity : AppCompatActivity(), CompositeDictionary.Dictio
         bytesDownloaded: Int,
         bytesTotal: Int
     ) {
-        // TODO update the UI to show download percentage
+        runOnUiThread {
+            rvAdapter!!.notifyItemChanged(dictionary!!.dictionaryList.indexOf(dictionaryInfo))
+        }
     }
 
     override fun onDictionaryDownloadComplete(
@@ -115,7 +247,13 @@ class ManageDictionaryActivity : AppCompatActivity(), CompositeDictionary.Dictio
         success: Boolean,
         err: Exception?
     ) {
-        // TODO refresh the UI to show the dictionary has downloaded
+        if (success) {
+            dictionary!!.postCommand(
+                CompositeDictionary.Command(
+                    CompositeDictionary.CommandName.UPDATE_LOCAL
+                )
+            )
+        }
     }
 
     override fun onDictionaryLoad(
@@ -123,7 +261,7 @@ class ManageDictionaryActivity : AppCompatActivity(), CompositeDictionary.Dictio
         success: Boolean,
         err: Exception?
     ) {
-        // nothing to do
+        // nothing to do here
     }
 
     override fun onDictionaryDelete(
@@ -131,7 +269,13 @@ class ManageDictionaryActivity : AppCompatActivity(), CompositeDictionary.Dictio
         success: Boolean,
         err: Exception?
     ) {
-        // TODO refresh the UI to show the new list of dictionaries
+        if (success) {
+            dictionary!!.postCommand(
+                CompositeDictionary.Command(
+                    CompositeDictionary.CommandName.UPDATE_LOCAL
+                )
+            )
+        }
     }
 
     override fun onAllDictionariesReady(success: Boolean, err: Exception?) {
@@ -142,8 +286,26 @@ class ManageDictionaryActivity : AppCompatActivity(), CompositeDictionary.Dictio
         // nothing to do
     }
 
+    @SuppressLint("NotifyDataSetChanged")
     override fun onIndexDownloadComplete(success: Boolean, err: Exception?) {
-        // TODO refresh the UI to show the updated dictionary list
+        runOnUiThread {
+            rvAdapter!!.notifyDataSetChanged()
+        }
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    override fun onHeadFilesComplete(successful : Int, total : Int,
+                                     success: Boolean, err: Exception?) {
+        runOnUiThread {
+            rvAdapter!!.notifyDataSetChanged()
+        }
+    }
+
+    @SuppressLint("NotifyDataSetChanged")
+    override fun onLocalFilesChecked() {
+        runOnUiThread {
+            rvAdapter!!.notifyDataSetChanged()
+        }
     }
 
     override fun onDictionaryLookup(

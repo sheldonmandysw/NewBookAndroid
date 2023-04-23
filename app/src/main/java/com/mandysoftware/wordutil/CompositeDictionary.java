@@ -48,6 +48,8 @@ public class CompositeDictionary {
     {
         INIT,
         DOWNLOAD_INDEX,
+        HEAD_FILES,
+        UPDATE_LOCAL,
         LOAD_OFFLINE,
         LOOKUP,
         SUGGEST,
@@ -87,6 +89,12 @@ public class CompositeDictionary {
                         break;
                     case DOWNLOAD_INDEX:
                         backgroundDownloadIndex();
+                        break;
+                    case HEAD_FILES:
+                        backgroundHeadFiles();
+                        break;
+                    case UPDATE_LOCAL:
+                        backgroundLocalUpdate();
                         break;
                     case LOAD_OFFLINE:
                         backgroundLoad();
@@ -241,6 +249,9 @@ public class CompositeDictionary {
         void onAllDictionariesReady(boolean success, @Nullable Exception err);
         void onIndexDownloadProgress(int bytesDownloaded, int bytesTotal);
         void onIndexDownloadComplete(boolean success, @Nullable Exception err);
+        void onHeadFilesComplete(int successCount, int totalCount, boolean success,
+                                 @Nullable Exception err);
+        void onLocalFilesChecked();
 
         // Since there may be multiple dictionaries (en, fr, etc.),
         // the result is a list of LookupResult.
@@ -280,6 +291,14 @@ public class CompositeDictionary {
         final String name;
         // Description is what we show to the user in a GUI list of dictionaries.
         final String description;
+        // Multi-purpose.
+        boolean availableOffline = false;
+        // File size is only useful for managing dictionaries and seeing the download size.
+        long fileSizeLocal = 0;
+        long fileSizeRemote = 0;
+        boolean hasUpdate = false;
+        // For managing dictionaries showing download progress. Progress is out of 100.
+        int progress = 0;
 
         public DictionaryInfo(String name, String description)
         {
@@ -295,6 +314,32 @@ public class CompositeDictionary {
         public String getDescription()
         {
             return description;
+        }
+
+        public boolean isAvailableOffline()
+        {
+            return availableOffline;
+        }
+
+        public long getFileSizeLocal()
+        {
+            return fileSizeLocal;
+        }
+
+        public long getFileSizeRemote()
+        {
+            return fileSizeRemote;
+        }
+
+        // Silly to have this method, but for Kotlin purposes - otherwise Kotlin won't give it to us.
+        public boolean getHasUpdate()
+        {
+            return hasUpdate;
+        }
+
+        public int getProgress()
+        {
+            return progress;
         }
     }
 
@@ -455,6 +500,91 @@ public class CompositeDictionary {
         return info;
     }
 
+    protected void backgroundLocalUpdate()
+    {
+        for (DictionaryInfo dictionaryInfo : dictionaryList)
+        {
+            String pathPrefix = getDictionaryPath(dictionaryRoot, dictionaryInfo.name);
+            String wapFilename = pathPrefix + ".wap";
+            String idxFilename = pathPrefix + ".idx";
+            File wapFile = new File(wapFilename);
+            File idxFile = new File(idxFilename);
+
+            boolean exists = wapFile.exists() && idxFile.exists();
+
+            if (exists)
+            {
+                dictionaryInfo.fileSizeLocal = wapFile.length() + idxFile.length();
+            }
+            else
+            {
+                dictionaryInfo.fileSizeLocal = 0;
+            }
+        }
+
+        for (DictionaryCallback callback : dictionaryCallbacks)
+        {
+            callback.onLocalFilesChecked();
+        }
+    }
+
+    // Runs in the background.
+    // Doesn't download anything, but asks the server for file sizes and modification times.
+    protected void backgroundHeadFiles()
+    {
+        int successCount = 0;
+        int totalCount = dictionaryList.size();
+        IOException lastError = null;
+
+        for (DictionaryInfo dictionaryInfo : dictionaryList)
+        {
+            String wapUrl = URL_PREFIX + "/" + dictionaryInfo.name + ".wap";
+            String idxUrl = URL_PREFIX + "/" + dictionaryInfo.name + ".idx";
+
+            String pathPrefix = getDictionaryPath(dictionaryRoot, dictionaryInfo.name);
+            String wapFilename = pathPrefix + ".wap";
+            String idxFilename = pathPrefix + ".idx";
+            File wapFile = new File(wapFilename);
+            File idxFile = new File(idxFilename);
+
+            try {
+                Downloader.HeadInfo wapHead = Downloader.Head(wapUrl);
+                Downloader.HeadInfo idxHead = Downloader.Head(idxUrl);
+
+                boolean exists = wapFile.exists() && idxFile.exists();
+
+                dictionaryInfo.hasUpdate = exists &&
+                        (wapHead.lastModified > wapFile.lastModified() ||
+                        idxHead.lastModified > idxFile.lastModified());
+
+                dictionaryInfo.fileSizeRemote = wapHead.contentLength + idxHead.contentLength;
+
+                if (exists)
+                {
+                    dictionaryInfo.fileSizeLocal = wapFile.length() + idxFile.length();
+                }
+                else
+                {
+                    dictionaryInfo.fileSizeLocal = 0;
+                }
+
+                successCount += 1;
+            }
+            catch (IOException err)
+            {
+                Log.e(TAG, err.getMessage());
+
+                lastError = err;
+            }
+        }
+
+        for (DictionaryCallback callback : dictionaryCallbacks)
+        {
+            callback.onHeadFilesComplete(successCount, totalCount,
+                    successCount == totalCount, lastError);
+        }
+    }
+
     // Runs in the background. Downloads a dictionary given its name (en, etc.).
     // Don't be fooled by the callbacks. This method is SYNCHRONOUS!!!
     // That is, while it calls all the callbacks, the method itself
@@ -488,6 +618,8 @@ public class CompositeDictionary {
             @Override
             public void onDownloadProgress(int loaded, int total) {
                 int totalBytes = (int) (total + (total * otherSize));
+
+                dictionaryInfo.progress = (int) (100 * (float) loaded / totalBytes);
 
                 for (DictionaryCallback callback : dictionaryCallbacks)
                 {
@@ -528,16 +660,25 @@ public class CompositeDictionary {
             public void onDownloadProgress(int loaded, int total) {
                 int loadedSoFar = loaded + loadedOtherBytesSoFar;
 
+                info.progress = (int) (100 * (float) loadedSoFar / (total + loadedOtherBytesSoFar));
+
                 for (DictionaryCallback callback : dictionaryCallbacks)
                 {
                     callback.onDictionaryDownloadProgress(info,
-                            loadedSoFar, total + loadedSoFar);
+                            loadedSoFar, total + loadedOtherBytesSoFar);
                 }
             }
 
             @Override
             public void onDownloadComplete(boolean success, @Nullable Exception err,
                                            int totalLoaded) {
+                if (success)
+                {
+                    info.hasUpdate = false;
+                    info.availableOffline = true;
+                    info.progress = 0;
+                }
+
                 for (DictionaryCallback callback : dictionaryCallbacks)
                 {
                     callback.onDictionaryDownloadComplete(info, success, err);
@@ -589,6 +730,9 @@ public class CompositeDictionary {
         if (success)
         {
             Log.i(TAG, "Dictionary " + name + " deleted successfully.");
+
+            dictionaryInfo.fileSizeLocal = 0;
+            dictionaryInfo.availableOffline = false;
         }
 
         for (DictionaryCallback callback : dictionaryCallbacks)
@@ -778,6 +922,8 @@ public class CompositeDictionary {
             {
                 Log.i(TAG, "Dictionary " + name + " is not available offline; skipping ...");
 
+                info.availableOffline = false;
+
                 continue;
             }
 
@@ -807,11 +953,15 @@ public class CompositeDictionary {
                 String lastText = dictionary.wapReader.lookupWord(last);
 
                 Log.v(TAG, "Definition of last word: " + lastText);
+
+                info.availableOffline = true;
             }
             catch (IOException|DataFormatException err)
             {
                 File wapFile = new File(pathPrefix + ".wap");
                 File idxFile = new File(pathPrefix + ".idx");
+
+                info.availableOffline = false;
 
                 Log.e(TAG, "Error loading dictionary: " + err.getMessage());
 
