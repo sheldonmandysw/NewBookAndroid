@@ -11,6 +11,9 @@
     <string name="manage_dictionary_delete">Delete</string>
 
     <string name="launch_dictionary_manager">Manage Dictionaries</string>
+    <string name="launch_dictionary">Dictionary</string>
 
     <string name="placeholder">PLACEHOLDER</string>
+
+    <string name="word_not_found">WORD NOT FOUND</string>
 </resources>

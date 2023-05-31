@@ -28,6 +28,7 @@ class MainActivity : AppCompatActivity(), CompositeDictionary.DictionaryCallback
         dictionary!!.addDictionaryCallback(this)
         dictionary!!.postCommand(CompositeDictionary.Command(CompositeDictionary.CommandName.INIT))
 
+
         // The following was used for testing. Don't uncomment unless you want to test it again.
         // It's manual testing, so you just look in LogCat to see that it's working.
         //testCommands()
@@ -36,6 +37,11 @@ class MainActivity : AppCompatActivity(), CompositeDictionary.DictionaryCallback
 
         findViewById<Button>(R.id.btnLaunchManager).setOnClickListener({
             val intent = Intent(this, ManageDictionaryActivity::class.java)
+            startActivity(intent)
+        })
+
+        findViewById<Button>(R.id.btnLaunchDictionary).setOnClickListener({
+            val intent = Intent(this, SearchActivity::class.java)
             startActivity(intent)
         })
     }

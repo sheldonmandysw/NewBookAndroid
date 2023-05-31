@@ -43,4 +43,10 @@ dependencies {
 
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
+
+    // https://mvnrepository.com/artifact/org.xwiki.rendering/xwiki-rendering-syntax-wikimodel
+    //implementation group: 'org.xwiki.rendering', name: 'xwiki-rendering-syntax-wikimodel', version: '15.3'
+
+
+
 }
