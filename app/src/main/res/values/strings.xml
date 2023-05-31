@@ -14,4 +14,6 @@
     <string name="launch_dictionary">Dictionary</string>
 
     <string name="placeholder">PLACEHOLDER</string>
+
+    <string name="word_not_found">WORD NOT FOUND</string>
 </resources>

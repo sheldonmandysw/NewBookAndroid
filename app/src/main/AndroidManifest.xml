@@ -14,7 +14,10 @@
         android:theme="@style/Theme.LivreNouveau"
         tools:targetApi="31">
         <activity
-            android:name=".DictionaryActivity"
+            android:name=".DefinitionActivity"
+            android:exported="false" />
+        <activity
+            android:name=".SearchActivity"
             android:exported="false" />
         <activity
             android:name=".ManageDictionaryActivity"

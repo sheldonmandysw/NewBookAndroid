@@ -15,7 +15,7 @@
         app:layout_constraintTop_toTopOf="parent" />
 
     <Button
-        android:id="@+id/btmLaunchDictionary"
+        android:id="@+id/btnLaunchDictionary"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:text="@string/launch_dictionary"
